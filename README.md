@@ -16,7 +16,7 @@
  ## 3. Sử dụng 1 file docker-compose.yml để cài đặt các docker container sau: 
    mariadb (3306), phpmyadmin (8080), nodered/node-red (1880), influxdb (8086), grafana/grafana (3000), nginx (80,443)
 
-   <img width="1920" height="1080" alt="Ảnh chụp màn hình (1063)" src="https://github.com/user-attachments/assets/38078bee-369e-474b-b23b-3871bc9f6b4b" />
+<img width="931" height="335" alt="image" src="https://github.com/user-attachments/assets/5d024e19-5a8b-42c4-9705-6f984d7785f5" />
 
    
    
