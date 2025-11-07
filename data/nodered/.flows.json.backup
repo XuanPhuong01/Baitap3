@@ -1,0 +1,696 @@
+[
+    {
+        "id": "flow1",
+        "type": "tab",
+        "label": "AppDB API",
+        "disabled": false,
+        "info": ""
+    },
+    {
+        "id": "1a5d4f82633b84a6",
+        "type": "MySQLdatabase",
+        "name": "",
+        "host": "mariadb",
+        "port": "3306",
+        "db": "appdb",
+        "tz": "",
+        "charset": "UTF8"
+    },
+    {
+        "id": "mysql_conf",
+        "type": "MySQLdatabase",
+        "name": "appdb",
+        "host": "mariadb",
+        "port": "3306",
+        "db": "appdb",
+        "tz": "",
+        "charset": "UTF8"
+    },
+    {
+        "id": "http_resp_default",
+        "type": "http response",
+        "z": "flow1",
+        "name": "",
+        "statusCode": "",
+        "headers": {},
+        "x": 1030,
+        "y": 220,
+        "wires": []
+    },
+    {
+        "id": "mysql_node_1",
+        "type": "mysql",
+        "z": "flow1",
+        "mydb": "mysql_conf",
+        "name": "appdb",
+        "x": 770,
+        "y": 220,
+        "wires": [
+            [
+                "http_resp_default"
+            ]
+        ]
+    },
+    {
+        "id": "http_in_products",
+        "type": "http in",
+        "z": "flow1",
+        "name": "GET /api/products",
+        "url": "/api/products",
+        "method": "get",
+        "upload": false,
+        "skipBodyParsing": false,
+        "swaggerDoc": "",
+        "x": 140,
+        "y": 160,
+        "wires": [
+            [
+                "fn_products_query"
+            ]
+        ]
+    },
+    {
+        "id": "fn_products_query",
+        "type": "function",
+        "z": "flow1",
+        "name": "Build products SQL",
+        "func": "const q = (msg.req.query && msg.req.query.q) ? msg.req.query.q.trim() : '';\nconst category = (msg.req.query && msg.req.query.category) ? msg.req.query.category.trim() : '';\n\nlet sql = \"SELECT id, category_id, name, slug, description, image_url, price, discount_percent, stock, sold, created_at FROM products\";\nlet where = [];\nif (category) {\n  const cid = parseInt(category);\n  if (!isNaN(cid)) where.push(\"category_id = \" + cid);\n}\nif (q) {\n  const safe = q.replace(/'/g, \"''\");\n  where.push(\"(name LIKE '%\"+safe+\"%' OR COALESCE(description,'') LIKE '%\"+safe+\"%')\");\n}\nif (where.length) sql += \" WHERE \" + where.join(\" AND \");\nsql += \" ORDER BY sold DESC, id DESC\";\nmsg.topic = sql;\nreturn msg;",
+        "outputs": 1,
+        "x": 430,
+        "y": 160,
+        "wires": [
+            [
+                "mysql_node_1"
+            ]
+        ]
+    },
+    {
+        "id": "http_in_categories",
+        "type": "http in",
+        "z": "flow1",
+        "name": "GET /api/categories",
+        "url": "/api/categories",
+        "method": "get",
+        "upload": false,
+        "swaggerDoc": "",
+        "x": 140,
+        "y": 260,
+        "wires": [
+            [
+                "fn_categories_query"
+            ]
+        ]
+    },
+    {
+        "id": "fn_categories_query",
+        "type": "function",
+        "z": "flow1",
+        "name": "Build categories SQL",
+        "func": "msg.topic = \"SELECT id, name, slug, description, image_url FROM categories ORDER BY name\";\nreturn msg;",
+        "outputs": 1,
+        "x": 420,
+        "y": 260,
+        "wires": [
+            [
+                "mysql_node_1"
+            ]
+        ]
+    },
+    {
+        "id": "http_in_hot",
+        "type": "http in",
+        "z": "flow1",
+        "name": "GET /api/hot",
+        "url": "/api/hot",
+        "method": "get",
+        "upload": false,
+        "swaggerDoc": "",
+        "x": 140,
+        "y": 320,
+        "wires": [
+            [
+                "fn_hot_query"
+            ]
+        ]
+    },
+    {
+        "id": "fn_hot_query",
+        "type": "function",
+        "z": "flow1",
+        "name": "Build hot products SQL",
+        "func": "msg.topic = \"SELECT id, name, price, sold FROM products ORDER BY sold DESC LIMIT 10\";\nreturn msg;",
+        "outputs": 1,
+        "x": 420,
+        "y": 320,
+        "wires": [
+            [
+                "mysql_node_1"
+            ]
+        ]
+    },
+    {
+        "id": "http_in_login",
+        "type": "http in",
+        "z": "flow1",
+        "name": "POST /api/login",
+        "url": "/api/login",
+        "method": "post",
+        "upload": false,
+        "swaggerDoc": "",
+        "x": 140,
+        "y": 420,
+        "wires": [
+            [
+                "fn_login_prepare"
+            ]
+        ]
+    },
+    {
+        "id": "fn_login_prepare",
+        "type": "function",
+        "z": "flow1",
+        "name": "Prepare login SQL",
+        "func": "// expects JSON body: { username, password_hash }\nconst body = msg.req?.body || msg.payload || {};\nconst username = (body.username || '').replace(/'/g, \"''\");\nmsg._password_plain = body.password_hash || ''; // lưu bản rõ để so sánh\nmsg.topic = `SELECT id, username, pwd_salt, pwd_hash, is_admin FROM users WHERE username='${username}' LIMIT 1`;\nreturn msg;\n",
+        "outputs": 1,
+        "timeout": "",
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 420,
+        "y": 420,
+        "wires": [
+            [
+                "mysql_node_1_login",
+                "4e68e39b8c8b55c4"
+            ]
+        ]
+    },
+    {
+        "id": "mysql_node_1_login",
+        "type": "mysql",
+        "z": "flow1",
+        "mydb": "mysql_conf",
+        "name": "appdb (login)",
+        "x": 650,
+        "y": 420,
+        "wires": [
+            [
+                "fn_login_check"
+            ]
+        ]
+    },
+    {
+        "id": "fn_login_check",
+        "type": "function",
+        "z": "flow1",
+        "name": "Check login & gen token",
+        "func": "const rows = msg.payload || [];\nconst supplied = msg._password_plain || ''; // bản rõ client gửi\n\nif (!rows || rows.length === 0) {\n  msg.statusCode = 401;\n  msg.payload = { success: false, message: 'Invalid username or password' };\n  return msg;\n}\n\nconst user = rows[0];\n\n// So sánh chuỗi bản rõ với pwd_hash trong DB\nif (user.pwd_hash !== supplied) {\n  msg.statusCode = 401;\n  msg.payload = { success: false, message: 'Invalid username or password' };\n  return msg;\n}\n\n// lưu user cho bước sau\nmsg._user = { id: user.id, username: user.username, is_admin: user.is_admin };\n\n// chuẩn bị tạo UUID token\nmsg.payload = null;\nreturn msg;\n",
+        "outputs": 1,
+        "timeout": "",
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 910,
+        "y": 420,
+        "wires": [
+            [
+                "uuid_gen",
+                "54a7db3b455d33d6"
+            ]
+        ]
+    },
+    {
+        "id": "uuid_gen",
+        "type": "uuid",
+        "z": "flow1",
+        "uuidVersion": "v4",
+        "name": "Generate Token",
+        "field": "payload",
+        "fieldType": "msg",
+        "x": 1150,
+        "y": 420,
+        "wires": [
+            [
+                "fn_store_session"
+            ]
+        ]
+    },
+    {
+        "id": "fn_store_session",
+        "type": "function",
+        "z": "flow1",
+        "name": "Store session SQL",
+        "func": "const token = (msg.payload || '').toString();\nconst user = msg._user;\n\nmsg._token = token;\nmsg.topic = `INSERT INTO sessions (user_id, token, created_at) VALUES (${user.id}, '${token}', NOW())`;\nmsg.payload = {};\nreturn msg;\n",
+        "outputs": 1,
+        "timeout": "",
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 1430,
+        "y": 420,
+        "wires": [
+            [
+                "mysql_node_1"
+            ]
+        ]
+    },
+    {
+        "id": "fn_after_store_session",
+        "type": "function",
+        "z": "flow1",
+        "name": "Respond login",
+        "func": "const token = msg._token || (msg.payload && msg.payload.token) || null;\nconst user = msg._user || {};\n\n// set cookie if possible\nif (msg.res && msg.res.cookie) {\n    msg.res.cookie('session_token', token, { httpOnly: false, path: '/', maxAge: 3*24*60*60*1000 });\n} else {\n    msg.headers = msg.headers || {};\n    msg.headers['Set-Cookie'] = `session_token=${token}; Path=/; Max-Age=${3*24*60*60}`;\n}\n\nmsg.statusCode = 200;\nmsg.payload = { success:true, token: token, user: user };\nreturn msg;",
+        "outputs": 1,
+        "timeout": "",
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 1700,
+        "y": 420,
+        "wires": [
+            [
+                "http_resp_default"
+            ]
+        ]
+    },
+    {
+        "id": "http_in_check",
+        "type": "http in",
+        "z": "flow1",
+        "name": "GET /api/check",
+        "url": "/api/check",
+        "method": "get",
+        "upload": false,
+        "swaggerDoc": "",
+        "x": 140,
+        "y": 520,
+        "wires": [
+            [
+                "fn_check_token"
+            ]
+        ]
+    },
+    {
+        "id": "fn_check_token",
+        "type": "function",
+        "z": "flow1",
+        "name": "Prepare session check SQL",
+        "func": "let token = '';\nif (msg.req && msg.req.headers['x-session-token']) token = msg.req.headers['x-session-token'];\nelse if (msg.req && msg.req.cookies && msg.req.cookies.session_token) token = msg.req.cookies.session_token;\n\nif (!token) {\n  msg.statusCode = 401;\n  msg.payload = { success:false, message:'No token provided' };\n  return msg;\n}\nconst safe = token.replace(/'/g, \"''\");\nmsg.topic = `SELECT s.token, s.user_id, u.username, u.is_admin FROM sessions s JOIN users u ON s.user_id=u.id WHERE s.token='${safe}' LIMIT 1`;\nreturn msg;",
+        "outputs": 1,
+        "x": 420,
+        "y": 520,
+        "wires": [
+            [
+                "mysql_node_1"
+            ]
+        ]
+    },
+    {
+        "id": "fn_check_token_result",
+        "type": "function",
+        "z": "flow1",
+        "name": "Check session result",
+        "func": "const rows = msg.payload || [];\nif (!rows || rows.length === 0) {\n  msg.statusCode = 401;\n  msg.payload = { success:false, message:'Invalid or expired session' };\n  return msg;\n}\nconst r = rows[0];\nmsg.statusCode = 200;\nmsg.payload = { success:true, user: { id: r.user_id, username: r.username, is_admin: !!r.is_admin } };\nreturn msg;",
+        "outputs": 1,
+        "x": 710,
+        "y": 520,
+        "wires": [
+            [
+                "http_resp_default"
+            ]
+        ]
+    },
+    {
+        "id": "http_in_admin_orders",
+        "type": "http in",
+        "z": "flow1",
+        "name": "GET /api/admin/orders",
+        "url": "/api/admin/orders",
+        "method": "get",
+        "upload": false,
+        "swaggerDoc": "",
+        "x": 150,
+        "y": 720,
+        "wires": [
+            [
+                "fn_admin_check"
+            ]
+        ]
+    },
+    {
+        "id": "fn_admin_check",
+        "type": "function",
+        "z": "flow1",
+        "name": "Check admin session SQL",
+        "func": "let token = msg.req?.headers['x-session-token'] || '';\nif (!token) {\n  msg.statusCode = 401;\n  msg.payload = { success:false, message:'No session token' };\n  return msg;\n}\nconst safe = token.replace(/'/g, \"''\");\nmsg.topic = `SELECT u.id, u.username, u.is_admin FROM sessions s JOIN users u ON s.user_id=u.id WHERE s.token='${safe}' LIMIT 1`;\nreturn msg;",
+        "outputs": 1,
+        "x": 430,
+        "y": 720,
+        "wires": [
+            [
+                "mysql_node_1"
+            ]
+        ]
+    },
+    {
+        "id": "fn_admin_after_check",
+        "type": "function",
+        "z": "flow1",
+        "name": "Admin -> fetch orders SQL",
+        "func": "const rows = msg.payload || [];\nif (!rows || rows.length === 0) {\n  msg.statusCode = 401;\n  msg.payload = { success:false, message:'Invalid session' };\n  return msg;\n}\nconst user = rows[0];\nif (!user.is_admin) {\n  msg.statusCode = 403;\n  msg.payload = { success:false, message:'Access denied' };\n  return msg;\n}\n\nmsg.topic = `\n  SELECT o.id AS order_id, o.user_id, o.customer_name, o.customer_phone, o.customer_address, o.total, o.status, o.created_at,\n         oi.product_id, oi.qty, oi.price, p.name AS product_name\n  FROM orders o\n  LEFT JOIN order_items oi ON oi.order_id = o.id\n  LEFT JOIN products p ON p.id = oi.product_id\n  ORDER BY o.created_at DESC, o.id DESC\n`;\nreturn msg;",
+        "outputs": 1,
+        "x": 740,
+        "y": 720,
+        "wires": [
+            [
+                "mysql_node_1"
+            ]
+        ]
+    },
+    {
+        "id": "fn_admin_format_orders",
+        "type": "function",
+        "z": "flow1",
+        "name": "Format admin orders",
+        "func": "const rows = msg.payload || [];\nif (!rows || rows.length === 0) { msg.payload = { success:true, orders: [] }; return msg; }\nconst orders = {};\nrows.forEach(r => {\n  if (!orders[r.order_id]) {\n    orders[r.order_id] = { id: r.order_id, user_id: r.user_id, customer_name: r.customer_name, customer_phone: r.customer_phone, customer_address: r.customer_address, total: r.total, status: r.status, created_at: r.created_at, items: [] };\n  }\n  if (r.product_id) orders[r.order_id].items.push({ product_id: r.product_id, product_name: r.product_name, qty: r.qty, price: r.price });\n});\nmsg.payload = { success:true, orders: Object.values(orders) };\nreturn msg;",
+        "outputs": 1,
+        "x": 1030,
+        "y": 720,
+        "wires": [
+            [
+                "http_resp_default"
+            ]
+        ]
+    },
+    {
+        "id": "http_in_create_order",
+        "type": "http in",
+        "z": "flow1",
+        "name": "POST /api/orders",
+        "url": "/api/orders",
+        "method": "post",
+        "upload": false,
+        "swaggerDoc": "",
+        "x": 140,
+        "y": 920,
+        "wires": [
+            [
+                "fn_order_prepare"
+            ]
+        ]
+    },
+    {
+        "id": "fn_order_prepare",
+        "type": "function",
+        "z": "flow1",
+        "name": "Prepare order - check token",
+        "func": "const order = msg.req.body || {};\nif (!order.items || !Array.isArray(order.items) || order.items.length === 0) {\n  msg.statusCode = 400;\n  msg.payload = { success:false, message:'Không có sản phẩm trong đơn hàng' };\n  return msg;\n}\nlet token = msg.req.headers['x-session-token'] || '';\nif (!token) { msg.statusCode = 401; msg.payload = { success:false, message:'Thiếu token xác thực' }; return msg; }\nconst safe = token.replace(/'/g, \"''\");\nmsg.topic = `SELECT u.id, u.username FROM sessions s JOIN users u ON s.user_id=u.id WHERE s.token='${safe}' LIMIT 1`;\nmsg._order = order;\nreturn msg;",
+        "outputs": 1,
+        "x": 440,
+        "y": 920,
+        "wires": [
+            [
+                "mysql_node_1"
+            ]
+        ]
+    },
+    {
+        "id": "fn_order_after_user",
+        "type": "function",
+        "z": "flow1",
+        "name": "Insert order row",
+        "func": "const rows = msg.payload || [];\nif (!rows || rows.length === 0) { msg.statusCode = 401; msg.payload = { success:false, message:'Token không hợp lệ hoặc hết hạn' }; return msg; }\nconst user = rows[0];\nconst order = msg._order;\n\nconst name = (order.customer_name || '').replace(/'/g, \"''\");\nconst phone = (order.customer_phone || order.phone || '').replace(/'/g, \"''\");\nconst addr = (order.customer_address || order.address || '').replace(/'/g, \"''\");\n\nconst total = order.items.reduce((sum, i) => sum + (Number(i.price) * Number(i.qty)), 0);\n\nmsg._user = user;\nmsg._order = order;\nmsg.topic = `INSERT INTO orders (user_id, customer_name, customer_phone, customer_address, total, status, created_at) VALUES (${user.id}, '${name}', '${phone}', '${addr}', ${total}, 'pending', NOW())`;\nmsg.payload = {};\nreturn msg;",
+        "outputs": 1,
+        "x": 760,
+        "y": 920,
+        "wires": [
+            [
+                "mysql_node_1"
+            ]
+        ]
+    },
+    {
+        "id": "fn_after_insert_order",
+        "type": "function",
+        "z": "flow1",
+        "name": "Insert order_items",
+        "func": "const insertResult = msg.payload || {};\nconst orderId = insertResult.insertId;\nconst order = msg._order;\nif (!orderId) { msg.statusCode = 500; msg.payload = { success:false, message:'Không tạo được đơn hàng' }; return msg; }\nconst values = order.items.map(i => `(${orderId}, ${i.product_id}, ${i.qty}, ${i.price})`).join(',');\nmsg.topic = `INSERT INTO order_items (order_id, product_id, qty, price) VALUES ${values}`;\nmsg._order_id = orderId;\nmsg.payload = {};\nreturn msg;",
+        "outputs": 1,
+        "x": 1060,
+        "y": 920,
+        "wires": [
+            [
+                "mysql_node_1"
+            ]
+        ]
+    },
+    {
+        "id": "fn_order_response",
+        "type": "function",
+        "z": "flow1",
+        "name": "Order response",
+        "func": "msg.statusCode = 200;\nmsg.payload = { success:true, order_id: msg._order_id, message: 'Đặt hàng thành công!' };\nreturn msg;",
+        "outputs": 1,
+        "x": 1370,
+        "y": 920,
+        "wires": [
+            [
+                "http_resp_default"
+            ]
+        ]
+    },
+    {
+        "id": "http_in_user_orders",
+        "type": "http in",
+        "z": "flow1",
+        "name": "GET /api/user/orders",
+        "url": "/api/user/orders",
+        "method": "get",
+        "upload": false,
+        "swaggerDoc": "",
+        "x": 150,
+        "y": 1120,
+        "wires": [
+            [
+                "fn_user_check"
+            ]
+        ]
+    },
+    {
+        "id": "fn_user_check",
+        "type": "function",
+        "z": "flow1",
+        "name": "Check user session SQL",
+        "func": "let token = msg.req?.headers['x-session-token'] || '';\nif (!token) { msg.statusCode = 401; msg.payload = { success:false, message:'No session token' }; return msg; }\nconst safe = token.replace(/'/g,\"''\");\nmsg.topic = `SELECT s.user_id, u.username, u.is_admin FROM sessions s JOIN users u ON s.user_id = u.id WHERE s.token='${safe}' LIMIT 1`;\nreturn msg;",
+        "outputs": 1,
+        "x": 440,
+        "y": 1120,
+        "wires": [
+            [
+                "mysql_node_1"
+            ]
+        ]
+    },
+    {
+        "id": "fn_user_orders_sql",
+        "type": "function",
+        "z": "flow1",
+        "name": "Build user orders SQL",
+        "func": "const rows = msg.payload || [];\nif (!rows || rows.length === 0) { msg.statusCode = 401; msg.payload = { success:false, message:'Invalid session' }; return msg; }\nconst user = rows[0];\nif (user.is_admin) { msg.statusCode = 403; msg.payload = { success:false, message:'Access denied for admin' }; return msg; }\nmsg.topic = `\n  SELECT o.id AS order_id, o.customer_name, o.customer_phone, o.customer_address, o.total, o.status, o.created_at,\n         oi.product_id, oi.qty, oi.price, p.name AS product_name\n  FROM orders o\n  LEFT JOIN order_items oi ON oi.order_id = o.id\n  LEFT JOIN products p ON p.id = oi.product_id\n  WHERE o.user_id = ${user.user_id}\n  ORDER BY o.created_at DESC, o.id DESC\n`;\nreturn msg;",
+        "outputs": 1,
+        "x": 760,
+        "y": 1120,
+        "wires": [
+            [
+                "mysql_node_1"
+            ]
+        ]
+    },
+    {
+        "id": "fn_user_orders_format",
+        "type": "function",
+        "z": "flow1",
+        "name": "Format user orders",
+        "func": "const rows = msg.payload || [];\nif (!rows || rows.length === 0) { msg.payload = { success:true, orders: [] }; return msg; }\nconst orders = {};\nrows.forEach(r => {\n  if (!orders[r.order_id]) orders[r.order_id] = { id: r.order_id, customer_name: r.customer_name, customer_phone: r.customer_phone, customer_address: r.customer_address, total: r.total, status: r.status, created_at: r.created_at, items: [] };\n  if (r.product_id) orders[r.order_id].items.push({ product_id: r.product_id, product_name: r.product_name, qty: r.qty, price: r.price });\n});\nmsg.payload = { success:true, orders: Object.values(orders) };\nreturn msg;",
+        "outputs": 1,
+        "x": 1060,
+        "y": 1120,
+        "wires": [
+            [
+                "http_resp_default"
+            ]
+        ]
+    },
+    {
+        "id": "http_in_stats_sales",
+        "type": "http in",
+        "z": "flow1",
+        "name": "GET /api/stats/sales",
+        "url": "/api/stats/sales",
+        "method": "get",
+        "upload": false,
+        "swaggerDoc": "",
+        "x": 150,
+        "y": 1320,
+        "wires": [
+            [
+                "fn_stats_sales"
+            ]
+        ]
+    },
+    {
+        "id": "fn_stats_sales",
+        "type": "function",
+        "z": "flow1",
+        "name": "Sales per day SQL",
+        "func": "msg.topic = `\n  SELECT DATE(o.created_at) AS day, SUM(oi.qty) AS quantity, SUM(oi.qty * oi.price) AS revenue\n  FROM orders o\n  JOIN order_items oi ON o.id = oi.order_id\n  GROUP BY DATE(o.created_at)\n  ORDER BY day ASC\n`;\nreturn msg;",
+        "outputs": 1,
+        "x": 430,
+        "y": 1320,
+        "wires": [
+            [
+                "mysql_node_1"
+            ]
+        ]
+    },
+    {
+        "id": "fn_stats_resp",
+        "type": "function",
+        "z": "flow1",
+        "name": "Return stats",
+        "func": "msg.statusCode = 200; return msg;",
+        "outputs": 1,
+        "x": 720,
+        "y": 1320,
+        "wires": [
+            [
+                "http_resp_default"
+            ]
+        ]
+    },
+    {
+        "id": "mysql_node_generic",
+        "type": "mysql",
+        "z": "flow1",
+        "mydb": "mysql_conf",
+        "name": "",
+        "x": 950,
+        "y": 1600,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "link_login_store_to_resp",
+        "type": "link out",
+        "z": "flow1",
+        "name": "",
+        "links": [
+            "link_login_store_to_resp_in"
+        ],
+        "x": 1560,
+        "y": 420,
+        "wires": []
+    },
+    {
+        "id": "link_login_store_to_resp_in",
+        "type": "link in",
+        "z": "flow1",
+        "name": "",
+        "links": [
+            "link_login_store_to_resp"
+        ],
+        "x": 1610,
+        "y": 420,
+        "wires": [
+            [
+                "fn_after_store_session"
+            ]
+        ]
+    },
+    {
+        "id": "connect_login_store_chain",
+        "type": "link out",
+        "z": "flow1",
+        "name": "",
+        "links": [
+            "connect_login_store_chain_in"
+        ],
+        "x": 1520,
+        "y": 540,
+        "wires": []
+    },
+    {
+        "id": "connect_login_store_chain_in",
+        "type": "link in",
+        "z": "flow1",
+        "name": "",
+        "links": [
+            "connect_login_store_chain"
+        ],
+        "x": 1740,
+        "y": 540,
+        "wires": [
+            [
+                "fn_after_store_session"
+            ]
+        ]
+    },
+    {
+        "id": "mysql_node_1_duplicate",
+        "type": "mysql",
+        "z": "flow1",
+        "mydb": "mysql_conf",
+        "name": "appdb (dup)",
+        "x": 950,
+        "y": 320,
+        "wires": [
+            [
+                "fn_check_token_result",
+                "fn_admin_after_check",
+                "fn_admin_format_orders",
+                "fn_after_insert_order",
+                "fn_order_response",
+                "fn_user_orders_sql",
+                "fn_user_orders_format",
+                "fn_stats_resp"
+            ]
+        ]
+    },
+    {
+        "id": "4e68e39b8c8b55c4",
+        "type": "debug",
+        "z": "flow1",
+        "name": "debug 1",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "false",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 560,
+        "y": 600,
+        "wires": []
+    },
+    {
+        "id": "54a7db3b455d33d6",
+        "type": "debug",
+        "z": "flow1",
+        "name": "debug 2",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "false",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 960,
+        "y": 620,
+        "wires": []
+    }
+]

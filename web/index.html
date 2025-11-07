@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <title>🍉 FruitShop Xuân Phương</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!-- Bootstrap CSS -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+
+  <style>
+    body {
+      background-color: #fffdf8;
+      font-family: 'Poppins', sans-serif;
+    }
+    .navbar {
+      background: linear-gradient(90deg, #ff7043, #ffa726);
+    }
+    .navbar-brand {
+      color: #fff !important;
+      font-weight: 600;
+    }
+    .nav-link {
+      color: #fff !important;
+      font-weight: 500;
+    }
+    .card {
+      border: none;
+      border-radius: 14px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      transition: all 0.3s ease;
+    }
+    .card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 6px 18px rgba(0,0,0,0.15);
+    }
+    footer {
+      background: #ff7043;
+      color: white;
+      padding: 10px 0;
+      text-align: center;
+      position: fixed;
+      bottom: 0;
+      width: 100%;
+    }
+    .btn-main {
+      background-color: #81c784;
+      color: white;
+      font-weight: 500;
+    }
+    .btn-main:hover {
+      background-color: #66bb6a;
+      color: white;
+    }
+    .category-box {
+      text-align: center;
+      background: white;
+      border-radius: 12px;
+      padding: 15px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+      transition: 0.2s;
+    }
+    .category-box:hover { transform: translateY(-3px); }
+    .page { display: none; }
+    .page.active { display: block; }
+  </style>
+</head>
+<body>
+  <!-- Navbar -->
+  <nav class="navbar navbar-expand-lg navbar-dark px-3">
+    <a class="navbar-brand" href="#"><i class="bi bi-basket2"></i> FruitShop Xuân Phương</a>
+    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navMenu">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+    <div class="collapse navbar-collapse" id="navMenu">
+      <ul class="navbar-nav ms-auto">
+        <li class="nav-item"><a class="nav-link" href="#" onclick="showPage('home')">Trang chủ</a></li>
+        <li class="nav-item"><a class="nav-link" href="#" onclick="showPage('cart')"><i class="bi bi-cart4"></i> Giỏ hàng</a></li>
+        <li class="nav-item"><a class="nav-link" href="#" onclick="showPage('orders')">Đơn hàng</a></li>
+        <li class="nav-item"><a id="loginBtn" class="nav-link" href="#" onclick="showPage('login')"><i class="bi bi-box-arrow-in-right"></i> Đăng nhập</a></li>
+        <li class="nav-item"><a id="logoutBtn" class="nav-link d-none" href="#" onclick="logout()"><i class="bi bi-box-arrow-right"></i> Đăng xuất</a></li>
+      </ul>
+    </div>
+  </nav>
+
+  <div class="container py-4 mb-5">
+    <!-- Trang chủ -->
+    <div id="home" class="page active">
+      <h3 class="mb-3 text-success"><i class="bi bi-tags"></i> Danh mục sản phẩm</h3>
+      <div class="row" id="categories"></div>
+
+      <h3 class="mt-4 mb-3 text-warning"><i class="bi bi-star-fill"></i> Sản phẩm nổi bật</h3>
+      <div class="row" id="hotProducts"></div>
+
+      <h3 class="mt-4 mb-3 text-danger"><i class="bi bi-box"></i> Tất cả sản phẩm</h3>
+      <div class="d-flex gap-2 mb-3">
+        <input class="form-control" id="searchBox" placeholder="🔍 Tìm kiếm..." oninput="loadProducts()">
+        <select class="form-select" id="categoryFilter" onchange="loadProducts()"></select>
+      </div>
+      <div class="row" id="products"></div>
+    </div>
+
+    <!-- Giỏ hàng -->
+    <div id="cart" class="page">
+      <h3 class="text-primary mb-3"><i class="bi bi-cart-check"></i> Giỏ hàng của bạn</h3>
+      <div id="cartItems" class="mb-3"></div>
+      <button class="btn btn-main" onclick="checkout()">Đặt hàng</button>
+    </div>
+
+    <!-- Đơn hàng -->
+    <div id="orders" class="page">
+      <h3 class="text-info mb-3"><i class="bi bi-clipboard2-check"></i> Lịch sử đơn hàng</h3>
+      <div id="orderList"></div>
+    </div>
+
+    <!-- Đăng nhập -->
+    <div id="login" class="page" style="max-width:400px;margin:auto;">
+      <h3 class="text-secondary mb-3"><i class="bi bi-person-circle"></i> Đăng nhập</h3>
+      <input id="username" class="form-control mb-2" placeholder="Tên đăng nhập" />
+      <input id="password" type="password" class="form-control mb-2" placeholder="Mật khẩu" />
+      <button class="btn btn-main w-100" onclick="login()">Đăng nhập</button>
+      <p id="loginMsg" class="text-danger mt-2"></p>
+    </div>
+  </div>
+
+  <footer>
+    © 2025 - Shop Hoa Quả Xuân Phương 🍎 Tươi sạch mỗi ngày
+  </footer>
+
+  <!-- Bootstrap JS -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
+  <script>
+    const API_BASE = '/nodered/api';
+    let sessionToken = localStorage.getItem('session_token') || '';
+    let cart = JSON.parse(localStorage.getItem('cart') || '[]');
+
+    function showPage(id) {
+      document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+      document.getElementById(id).classList.add('active');
+      if (id === 'home') loadAll();
+      if (id === 'orders') loadOrders();
+      if (id === 'cart') renderCart();
+    }
+
+    async function apiGet(url) {
+      const res = await fetch(API_BASE + url, { headers: { 'x-session-token': sessionToken } });
+      return res.json();
+    }
+
+    async function apiPost(url, data) {
+      const res = await fetch(API_BASE + url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-session-token': sessionToken },
+        body: JSON.stringify(data)
+      });
+      return res.json();
+    }
+
+    async function loadAll() {
+      loadCategories();
+      loadHotProducts();
+      loadProducts();
+    }
+
+    async function loadCategories() {
+      const res = await apiGet('/categories');
+      const box = document.getElementById('categories');
+      const filter = document.getElementById('categoryFilter');
+      box.innerHTML = '';
+      filter.innerHTML = '<option value="">Tất cả</option>';
+      res.forEach(c => {
+        box.innerHTML += `
+          <div class="col-6 col-md-3 mb-3">
+            <div class="category-box">
+              <img src="${c.image_url || 'https://cdn-icons-png.flaticon.com/512/2909/2909763.png'}" class="img-fluid rounded mb-2" alt="">
+              <div><b>${c.name}</b></div>
+            </div>
+          </div>`;
+        filter.innerHTML += `<option value="${c.id}">${c.name}</option>`;
+      });
+    }
+
+    async function loadHotProducts() {
+      const res = await apiGet('/hot');
+      const box = document.getElementById('hotProducts');
+      box.innerHTML = '';
+      res.forEach(p => {
+        box.innerHTML += `
+          <div class="col-6 col-md-3 mb-3">
+            <div class="card text-center">
+              <img src="${p.image_url || 'https://cdn-icons-png.flaticon.com/512/415/415733.png'}" class="card-img-top">
+              <div class="card-body">
+                <h6 class="card-title">${p.name}</h6>
+                <p class="text-danger fw-bold">${p.price}₫</p>
+                <p><i class="bi bi-fire text-warning"></i> ${p.sold} đã bán</p>
+              </div>
+            </div>
+          </div>`;
+      });
+    }
+
+    async function loadProducts() {
+      const q = document.getElementById('searchBox').value.trim();
+      const cat = document.getElementById('categoryFilter').value;
+      const res = await apiGet(`/products?q=${encodeURIComponent(q)}&category=${cat}`);
+      const box = document.getElementById('products');
+      box.innerHTML = '';
+      res.forEach(p => {
+        box.innerHTML += `
+          <div class="col-6 col-md-3 mb-3">
+            <div class="card text-center">
+              <img src="${p.image_url || 'https://cdn-icons-png.flaticon.com/512/415/415733.png'}" class="card-img-top">
+              <div class="card-body">
+                <h6 class="card-title">${p.name}</h6>
+                <p class="text-danger fw-bold">${p.price}₫</p>
+                <button class="btn btn-main btn-sm" onclick="addToCart(${p.id}, '${p.name}', ${p.price})"><i class="bi bi-cart-plus"></i> Mua</button>
+              </div>
+            </div>
+          </div>`;
+      });
+    }
+
+    function addToCart(id, name, price) {
+      const existing = cart.find(i => i.product_id === id);
+      if (existing) existing.qty++;
+      else cart.push({ product_id: id, product_name: name, price, qty: 1 });
+      localStorage.setItem('cart', JSON.stringify(cart));
+      alert('✅ Đã thêm vào giỏ hàng!');
+    }
+
+    function renderCart() {
+      const box = document.getElementById('cartItems');
+      if (cart.length === 0) return box.innerHTML = '<p>🕳 Giỏ hàng trống.</p>';
+      let total = 0;
+      box.innerHTML = cart.map(i => {
+        total += i.price * i.qty;
+        return `<div class="d-flex justify-content-between border-bottom py-1">
+          <span>${i.product_name} x${i.qty}</span>
+          <b>${i.price * i.qty}₫</b>
+        </div>`;
+      }).join('') + `<div class="text-end mt-2 fw-bold text-danger">Tổng cộng: ${total}₫</div>`;
+    }
+
+    async function checkout() {
+      if (!sessionToken) {
+        alert('Vui lòng đăng nhập trước khi đặt hàng.');
+        return showPage('login');
+      }
+      const order = {
+        customer_name: 'Khách hàng',
+        customer_phone: '0123456789',
+        customer_address: 'Đà Nẵng',
+        items: cart
+      };
+      const res = await apiPost('/orders', order);
+      if (res.success) {
+        alert('🎉 Đặt hàng thành công!');
+        cart = [];
+        localStorage.removeItem('cart');
+        showPage('orders');
+      } else alert(res.message || 'Lỗi đặt hàng');
+    }
+
+    async function login() {
+      const u = document.getElementById('username').value;
+      const p = document.getElementById('password').value;
+      const hash = p;
+      const res = await apiPost('/login', { username: u, password_hash: hash });
+      const msg = document.getElementById('loginMsg');
+      if (res.success) {
+        sessionToken = res.token;
+        localStorage.setItem('session_token', sessionToken);
+        msg.textContent = 'Đăng nhập thành công!';
+        document.getElementById('loginBtn').classList.add('d-none');
+        document.getElementById('logoutBtn').classList.remove('d-none');
+        showPage('home');
+      } else msg.textContent = res.message || 'Sai tài khoản hoặc mật khẩu';
+    }
+
+    function logout() {
+      sessionToken = '';
+      localStorage.removeItem('session_token');
+      document.getElementById('loginBtn').classList.remove('d-none');
+      document.getElementById('logoutBtn').classList.add('d-none');
+      alert('Đã đăng xuất!');
+      showPage('home');
+    }
+
+    async function loadOrders() {
+      if (!sessionToken) return document.getElementById('orderList').innerHTML = '<p>Vui lòng đăng nhập</p>';
+      const res = await apiGet('/user/orders');
+      const box = document.getElementById('orderList');
+      if (!res.orders || res.orders.length === 0) return box.innerHTML = '<p>Chưa có đơn hàng nào</p>';
+      box.innerHTML = res.orders.map(o => `
+        <div class="border rounded p-2 mb-2 bg-white shadow-sm">
+          <b>Đơn #${o.id}</b> - ${o.status}<br>
+          Tổng: <span class="text-danger fw-bold">${o.total}₫</span>
+          <ul>${o.items.map(i => `<li>${i.product_name} x${i.qty}</li>`).join('')}</ul>
+        </div>`).join('');
+    }
+
+    loadAll();
+    if (sessionToken) {
+      document.getElementById('loginBtn').classList.add('d-none');
+      document.getElementById('logoutBtn').classList.remove('d-none');
+    }
+  </script>
+</body>
+</html>
